@@ -1,0 +1,60 @@
+services:
+  app:
+    build: .
+    command: bash -lc "bundle exec rails db:prepare && bundle exec rails server -b 0.0.0.0 -p 3000"
+    environment:
+      RAILS_ENV: production
+      SECRET_KEY_BASE_DUMMY: 1
+      POSTGRES_HOST: db
+      POSTGRES_DB: ror_starter_production
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: entity-events
+      KAFKA_GROUP_ID: ror-starter-group
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ror_starter_production
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ror_starter_production"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  kafka:
+    image: redpandadata/redpanda:v24.3.7
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --reserve-memory
+      - "0M"
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://kafka:9092
+    ports:
+      - "9092:9092"
+
+volumes:
+  postgres_data:
